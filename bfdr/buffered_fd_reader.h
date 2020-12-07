@@ -1,6 +1,7 @@
 #ifndef BUFFERED_FD_READER_H
 #define BUFFERED_FD_READER_H
 
+#include <cstdio>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
