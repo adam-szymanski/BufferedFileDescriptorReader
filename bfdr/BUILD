@@ -5,5 +5,8 @@ cc_library(
     hdrs = [
         "buffered_fd_reader.h",
     ],
+    srcs = [
+        "buffered_fd_reader.cpp",
+    ],
     visibility = ["//visibility:public"],
 )

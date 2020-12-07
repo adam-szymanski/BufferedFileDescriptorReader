@@ -1,6 +1,7 @@
 #ifndef BUFFERED_FD_READER_H
 #define BUFFERED_FD_READER_H
 
+#include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -46,7 +47,7 @@ public:
             size_t br = bufferDataSize - bufferPos;
             memcpy(buf, buffer + bufferPos, br);
             bytesRead += br;
-            buf += br;
+            buf = (char*)buf + br;
             ssize_t ret = read(buffer, bufferSize);
             if (ret == 0) {
                 eof = true;
@@ -94,8 +95,6 @@ private:
         return pageSize;
     }
 };
-
-long BufferedFileDescriptorReader::pageSize = 0;
 
 }
 
