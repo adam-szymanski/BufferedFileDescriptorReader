@@ -21,13 +21,19 @@ private:
     size_t bufferSize;
     size_t bufferDataSize; // Amount of data loaded into buffer.
     size_t bufferPos; // Our position within buffer.
+    off_t offsetRemainder;
     bool eof;
     int lastErr;
 
 public:
-    BufferedFileDescriptorReader(size_t bufferSize) {
-        bufferSize = alignSize(bufferSize, pageSize);
+    BufferedFileDescriptorReader(size_t bufferSize = (1 << 20))
+        : bufferSize(bufferSize) {
+        bufferSize = alignSize(bufferSize, getPageSize());
         buffer = (char*)mmap(NULL, bufferSize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0);
+        if (buffer == (char*) -1) {
+            printf("error when creating BufferedFileDescriptorReader: %s\n", strerror(errno));
+            return;
+        }
     }
 
     // Returns true if file was opened succesfully.
@@ -37,18 +43,19 @@ public:
         bufferPos = 0;
         eof = false;
         lastErr = 0;
+        offsetRemainder = 0;
         return fd > 2;
     }
 
     ssize_t read(void *buf, size_t nbyte) {
         lastErr = 0;
         ssize_t bytesRead = 0;
-        while (bufferDataSize - bufferPos <= nbyte - bytesRead) { // We do not have enough data in buffer to satisfy read, lets copy what we have and load more
+        while (bufferDataSize - bufferPos + bytesRead <= nbyte) { // We do not have enough data in buffer to satisfy read, lets copy what we have and load more
             size_t br = bufferDataSize - bufferPos;
             memcpy(buf, buffer + bufferPos, br);
             bytesRead += br;
             buf = (char*)buf + br;
-            ssize_t ret = read(buffer, bufferSize);
+            ssize_t ret = ::read(fd, buffer, bufferSize);
             if (ret == 0) {
                 eof = true;
                 bufferPos = bufferDataSize;
@@ -59,7 +66,8 @@ public:
                 return bytesRead;
             }
             bufferDataSize = size_t(ret);
-            bufferPos = 0;
+            bufferPos = offsetRemainder;
+            offsetRemainder = 0;
         }
         memcpy(buf, buffer + bufferPos, nbyte - bytesRead);
         bufferPos += nbyte - bytesRead;
@@ -76,6 +84,14 @@ public:
         return ret;
     }
 
+    inline off_t lseek(off_t offset, int whence) {
+        // TODO let's check whether we are still in buffer, if yes then let's not clear all
+        bufferDataSize = bufferPos = 0;
+        offsetRemainder = offset & (getPageSize() - 1);
+        offset -= offsetRemainder;
+        return ::lseek(fd, offset, whence);
+    }
+
     ~BufferedFileDescriptorReader() {
         if (fd != -1) {
             ::close(fd);
@@ -86,6 +102,7 @@ public:
 private:
 
     static long pageSize;
+    static long pageSizeMask;
 
     // Obtaining this required syscall so it's better to cache it than make it every time we create reader.
     static inline long getPageSize() {
