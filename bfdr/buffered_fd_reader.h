@@ -23,8 +23,6 @@ private:
     size_t bufferDataSize; // Amount of data loaded into buffer.
     size_t bufferPos; // Our position within buffer.
     off_t offsetRemainder;
-    bool eof;
-    int lastErr;
 
 public:
     BufferedFileDescriptorReader(size_t bufferSize = (1 << 20))
@@ -42,14 +40,11 @@ public:
         fd = ::open(path, O_RDONLY | O_DIRECT | additionalFlags);
         bufferDataSize = 0;
         bufferPos = 0;
-        eof = false;
-        lastErr = 0;
         offsetRemainder = 0;
         return fd > 2;
     }
 
     ssize_t read(void *buf, size_t nbyte) {
-        lastErr = 0;
         ssize_t bytesRead = 0;
         while (bufferDataSize - bufferPos + bytesRead <= nbyte) { // We do not have enough data in buffer to satisfy read, lets copy what we have and load more
             size_t br = bufferDataSize - bufferPos;
@@ -57,12 +52,7 @@ public:
             bytesRead += br;
             buf = (char*)buf + br;
             ssize_t ret = ::read(fd, buffer, bufferSize);
-            if (ret == 0) {
-                eof = true;
-                bufferPos = bufferDataSize;
-                return bytesRead;
-            } else if (ret < 0) {
-                lastErr = errno;
+            if (ret <= 0) {
                 bufferPos = bufferDataSize;
                 return bytesRead;
             }
@@ -73,10 +63,6 @@ public:
         memcpy(buf, buffer + bufferPos, nbyte - bytesRead);
         bufferPos += nbyte - bytesRead;
         return nbyte;
-    }
-
-    inline int lastErrno() {
-        return lastErr;
     }
 
     int close() {
