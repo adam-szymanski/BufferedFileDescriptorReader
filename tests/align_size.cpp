@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "buffered_fd_reader/buffered_fd_reader.h"
+#include "bfdr/buffered_fd_reader.h"
 
 TEST(ALIGN_SIZE, TEST) {
   EXPECT_EQ(bfdr::alignSize(0x123456, 0x100), 0x123500);

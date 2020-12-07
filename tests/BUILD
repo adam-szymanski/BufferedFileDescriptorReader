@@ -4,6 +4,6 @@ cc_test(
     copts = ["-Iexternal/gtest/include"],
     deps = [
         "@gtest//:gtest_main",
-        "//buffered_fd_reader:lib",
+        "//bfdr:lib",
     ],
 )
