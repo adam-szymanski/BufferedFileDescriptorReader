@@ -24,6 +24,7 @@ private:
     size_t bufferPos; // Our position within buffer.
     off_t offsetRemainder;
     int lastError;
+    off_t offset = 0;
 
 public:
     BufferedFileDescriptorReader(size_t bufferSize = (1 << 20))
@@ -54,12 +55,18 @@ public:
             bytesRead += br;
             buf = (char*)buf + br;
             if (loadBuffer() <= 0) {
+                offset += bytesRead;
                 return bytesRead;
             }
         }
         memcpy(buf, buffer + bufferPos, nbyte - bytesRead);
         bufferPos += nbyte - bytesRead;
+        offset += nbyte;
         return nbyte;
+    }
+
+    inline off_t getOffset() const {
+        return offset;
     }
 
     inline int fstat(struct stat *statbuf) {
@@ -88,7 +95,11 @@ public:
         bufferDataSize = bufferPos = 0;
         offsetRemainder = offset & (getPageSize() - 1);
         offset -= offsetRemainder;
-        return ::lseek(fd, offset, whence);
+        off_t ret = ::lseek(fd, offset, whence);
+        if (ret > 0) {
+            this->offset = ret;
+        }
+        return ret;
     }
 
     ~BufferedFileDescriptorReader() {
