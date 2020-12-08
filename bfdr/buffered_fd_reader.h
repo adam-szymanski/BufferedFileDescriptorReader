@@ -23,6 +23,7 @@ private:
     size_t bufferDataSize; // Amount of data loaded into buffer.
     size_t bufferPos; // Our position within buffer.
     off_t offsetRemainder;
+    int lastError;
 
 public:
     BufferedFileDescriptorReader(size_t bufferSize = (1 << 20))
@@ -41,28 +42,35 @@ public:
         bufferDataSize = 0;
         bufferPos = 0;
         offsetRemainder = 0;
+        lastError = 0;
         return fd > 2;
     }
 
-    ssize_t read(void *buf, size_t nbyte) {
+    inline ssize_t read(void *buf, size_t nbyte) {
         ssize_t bytesRead = 0;
         while (bufferDataSize - bufferPos + bytesRead <= nbyte) { // We do not have enough data in buffer to satisfy read, lets copy what we have and load more
             size_t br = bufferDataSize - bufferPos;
             memcpy(buf, buffer + bufferPos, br);
             bytesRead += br;
             buf = (char*)buf + br;
-            ssize_t ret = ::read(fd, buffer, bufferSize);
-            if (ret <= 0) {
-                bufferPos = bufferDataSize;
+            if (loadBuffer() <= 0) {
                 return bytesRead;
             }
-            bufferDataSize = size_t(ret);
-            bufferPos = offsetRemainder;
-            offsetRemainder = 0;
         }
         memcpy(buf, buffer + bufferPos, nbyte - bytesRead);
         bufferPos += nbyte - bytesRead;
         return nbyte;
+    }
+
+    inline int getChar(char& c) {
+        if (bufferDataSize == bufferPos) {
+            ssize_t ret = loadBuffer();
+            if (ret <= 0) {
+                return ret;
+            }
+        }
+        c = buffer[bufferPos++];
+        return 1;
     }
 
     int close() {
@@ -87,7 +95,6 @@ public:
     }
 
 private:
-
     static long pageSize;
     static long pageSizeMask;
 
@@ -97,6 +104,19 @@ private:
             pageSize = sysconf(_SC_PAGESIZE);
         }
         return pageSize;
+    }
+
+    inline ssize_t loadBuffer() {
+        ssize_t ret = ::read(fd, buffer, bufferSize);
+        if (ret <= 0) {
+            lastError = errno;
+            bufferPos = bufferDataSize;
+            return ret;
+        }
+        bufferDataSize = size_t(ret);
+        bufferPos = offsetRemainder;
+        offsetRemainder = 0;
+        return ret;
     }
 };
 
