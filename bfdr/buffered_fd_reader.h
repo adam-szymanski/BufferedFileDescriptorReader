@@ -81,6 +81,7 @@ public:
             }
         }
         c = buffer[bufferPos++];
+        ++offset;
         return 1;
     }
 
