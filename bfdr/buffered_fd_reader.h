@@ -62,6 +62,10 @@ public:
         return nbyte;
     }
 
+    inline int fstat(struct stat *statbuf) {
+        return ::fstat(fd, statbuf);
+    }
+
     inline int getChar(char& c) {
         if (bufferDataSize == bufferPos) {
             ssize_t ret = loadBuffer();
