@@ -97,8 +97,8 @@ public:
         offsetRemainder = offset & (getPageSize() - 1);
         offset -= offsetRemainder;
         off_t ret = ::lseek(fd, offset, whence);
-        if (ret > 0) {
-            this->offset = ret;
+        if (ret >= 0) {
+            this->offset = offset + offsetRemainder;
         }
         return ret;
     }
